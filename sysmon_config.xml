@@ -1,0 +1,8 @@
+<Sysmon schemaversion="4.0">
+  <HashAlgorithms>MD5,SHA256,IMPHASH</HashAlgorithms>
+  <EventFiltering>
+    <ImageLoad onmatch="include">
+      <ImageLoaded condition="contains">evil_hacker</ImageLoaded>
+    </ImageLoad>
+  </EventFiltering>
+</Sysmon>
