@@ -1,0 +1,40 @@
+---
+RuleName: "RoguePlanet - Initial Exploit Execution"
+Description: "Cảnh báo sớm: Phát hiện tệp thực thi mã khai thác khởi chạy trên hệ thống."
+Severity: "HIGH"
+EventID: "1"
+Selections:
+  Image: "*\\RoguePlanet.exe"
+
+---
+RuleName: "Anomalous SYSTEM Shell (RoguePlanet LPE Pattern)"
+Description: "Bắt quả tang LPE (Điểm nổ): Phát hiện vỏ lệnh tương tác được sinh ra với đặc quyền SYSTEM từ các tiến trình trung gian. Đây là kết quả trực tiếp của việc lạm dụng Race Condition để thao túng luồng thực thi."
+Severity: "CRITICAL"
+EventID: "1"
+Selections:
+  ParentImage: 
+    - "*\\conhost.exe"
+    - "*\\wermgr.exe"
+    - "*\\MsMpEng.exe"
+  Image: 
+    - "*\\cmd.exe"
+    - "*\\powershell.exe"
+  IntegrityLevel: "System"
+
+---
+RuleName: "RoguePlanet - Post-Exploitation (PowerShell Tampering)"
+Description: "Hậu khai thác: Phát hiện kẻ tấn công sử dụng PowerShell để vô hiệu hóa các tính năng bảo vệ lõi của Windows Defender (T1059.001)."
+Severity: "HIGH"
+EventID: "1"
+Selections:
+  Image: "*\\powershell.exe"
+  CommandLine: "*Set-MpPreference*DisableRealtimeMonitoring*"
+
+---
+RuleName: "RoguePlanet - Post-Exploitation (Service Stop Attempt)"
+Description: "Hậu khai thác: Phát hiện các dòng lệnh cố gắng tắt tiến trình dịch vụ cốt lõi của Defender (WinDefend)."
+Severity: "HIGH"
+EventID: "1"
+Selections:
+  Image: "*\\cmd.exe"
+  CommandLine: "*sc stop WinDefend*"

@@ -7,6 +7,37 @@ class ThreatDetector:
     def __init__(self, db_path="database/threatscope.db"):
         self.db_path = db_path
         self.rule_engine = RuleEngine(rules_dir="rules")
+        
+        # --- BỘ ĐỆM RAM (CACHE) ---
+        self.dll_cache = {} 
+        self._load_db_to_cache()
+
+    def _load_db_to_cache(self):
+        """Đọc DB một lần duy nhất lúc khởi động và nạp vào RAM"""
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            # Rút toàn bộ dữ liệu cần thiết từ các bảng
+            query = '''
+                SELECT LOWER(e.exe_name) as exe_name, LOWER(t.dll_name) as dll_name, 
+                       t.technique_id, t.severity, f.feed_name, e.expected_paths
+                FROM target_dlls t
+                JOIN executables e ON t.exe_id = e.id
+                JOIN feeds f ON t.feed_id = f.id
+            '''
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            
+            # Nạp vào Dictionary với key định danh là "tên_exe|tên_dll"
+            for row in rows:
+                cache_key = f"{row['exe_name']}|{row['dll_name']}"
+                self.dll_cache[cache_key] = dict(row)
+                
+            conn.close()
+            print(f"[+] Lõi Nhận diện: Đã nạp {len(self.dll_cache)} luật DLL vào bộ đệm RAM thành công.")
+        except Exception as e:
+            print(f"[!] Lỗi nạp Database Cache: {e}")
 
     def _get_connection(self):
         conn = sqlite3.connect(self.db_path)
@@ -20,7 +51,7 @@ class ThreatDetector:
 
         # --- TẦNG LỌC 1: ĐỐI CHIẾU DATABASE (DÀNH RIÊNG CHO EVENT ID 7 - DLL HIJACKING) ---
         if str(event.get('EventID')) == '7':
-            alert_from_db = self._check_dll_sideloading_with_db(event)
+            alert_from_db = self._detect_dll_hijacking(event)
             if alert_from_db:
                 return alert_from_db
 
@@ -37,35 +68,32 @@ class ThreatDetector:
         
         if not exe_path or not dll_path: return None
 
+        # --- BỘ LỌC CỨNG: LOẠI BỎ FALSE POSITIVE ---
+        safe_system_folders = [
+            '\\windows\\system32\\', 
+            '\\windows\\syswow64\\', 
+            '\\windows\\winsxs\\'
+        ]
+        
+        if any(folder in dll_path.lower() for folder in safe_system_folders):
+            return None
+
         exe_name = os.path.basename(exe_path).lower()
         dll_name = os.path.basename(dll_path).lower()
         
-        conn = self._get_connection()
-        cursor = conn.cursor()
+        # --- TRA CỨU TỐC ĐỘ CAO TỪ BỘ ĐỆM RAM ---
+        cache_key = f"{exe_name}|{dll_name}"
+        match = self.dll_cache.get(cache_key)
 
-        # 1. Truy vấn xem Tiến trình và DLL có nằm trong danh sách theo dõi không
-        query = '''
-            SELECT t.id as dll_id, t.technique_id, t.severity, f.feed_name, e.expected_paths
-            FROM target_dlls t
-            JOIN executables e ON t.exe_id = e.id
-            JOIN feeds f ON t.feed_id = f.id
-            WHERE LOWER(e.exe_name) = ? AND LOWER(t.dll_name) = ?
-        '''
-        cursor.execute(query, (exe_name, dll_name))
-        match = cursor.fetchone()
-
+        # Nếu không có trong danh sách theo dõi -> Bỏ qua lập tức
         if not match:
-            conn.close()
             return None
 
-        # 2. Phát hiện: Kẻ tấn công thường nạp DLL từ thư mục bất thường (Temp, AppData...)
         expected_paths = match['expected_paths'].lower().split(',') if match['expected_paths'] else []
         is_safe_path = any(safe_dir in dll_path.lower() for safe_dir in expected_paths) if expected_paths else True
         
-        # 3. Phân tích Chữ ký số
         sig_status = event.get('SignatureStatus', '').lower()
-        
-        # TÍNH TOÁN RỦI RO (RISK SCORING)
+
         is_malicious = False
         reason = []
 
@@ -76,8 +104,6 @@ class ThreatDetector:
         if sig_status in ['unsigned', 'invalid']:
             is_malicious = True
             reason.append("Chữ ký số không hợp lệ hoặc bị thiếu")
-
-        conn.close()
 
         if is_malicious:
             return {

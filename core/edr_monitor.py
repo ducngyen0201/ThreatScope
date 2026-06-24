@@ -1,6 +1,6 @@
 import time
 import threading
-import psutil
+import ctypes
 import win32evtlog
 import xml.etree.ElementTree as ET
 from core.detector import ThreatDetector
@@ -34,20 +34,33 @@ class EDRMonitor:
 
     def _tail_event_log(self):
         last_record_id = 0
-        # Cờ truy vấn: Lấy log từ kênh chỉ định và đọc ngược (từ mới nhất về cũ nhất)
-        query_flags = win32evtlog.EvtQueryChannelPath | win32evtlog.EvtQueryReverseDirection
+        
+        # 1. TÌM CỘT MỐC: Lấy ID của dòng log mới nhất hiện tại
+        try:
+            init_hand = win32evtlog.EvtQuery(self.log_channel, win32evtlog.EvtQueryChannelPath | win32evtlog.EvtQueryReverseDirection, "*")
+            init_events = win32evtlog.EvtNext(init_hand, 1)
+            if init_events:
+                xml_content = win32evtlog.EvtRender(init_events[0], win32evtlog.EvtRenderEventXml)
+                root = ET.fromstring(xml_content)
+                last_record_id = int(root.find(f'.//{self.ns}EventRecordID').text)
+            if init_hand: init_hand.Close()
+        except:
+            pass
 
         while not self.stop_event.is_set():
             hand = None
             try:
-                # 1. Chủ động chọc thẳng vào DB của Sysmon
-                hand = win32evtlog.EvtQuery(self.log_channel, query_flags, "*")
+                # 2. XPATH QUYỀN LỰC: Chỉ xin Windows những Log có ID lớn hơn cột mốc
+                xpath_query = f"*[System[(EventRecordID > {last_record_id})]]"
+                query_flags = win32evtlog.EvtQueryChannelPath | win32evtlog.EvtQueryForwardDirection
                 
-                # 2. Rút ra 15 sự kiện mới nhất
-                events = win32evtlog.EvtNext(hand, 15)
+                hand = win32evtlog.EvtQuery(self.log_channel, query_flags, xpath_query)
+                
+                # Có thể để 100 thoải mái, vì Windows chỉ trả về log mới. Nếu không có log mới, nó trả về 0.
+                events = win32evtlog.EvtNext(hand, 100) 
                 
                 if events:
-                    for event in reversed(events):
+                    for event in events:
                         if self.stop_event.is_set(): break
                         
                         xml_content = win32evtlog.EvtRender(event, win32evtlog.EvtRenderEventXml)
@@ -56,18 +69,19 @@ class EDRMonitor:
                         if event_dict:
                             record_id = int(event_dict.get('RecordID', 0))
                             
-                            # 3. Chỉ xử lý nếu là sự kiện mới toanh (chưa từng quét)
+                            alert = self.detector.scan_event(event_dict)
+                            if alert:
+                                pid = event_dict.get('ProcessId')
+                                
+                                # Tiêu diệt và báo cáo gọn gàng
+                                kill_status = self._kill_malicious_process(pid, alert['Process'])
+                                alert['Details'] += f" | Trạng thái: Đã tiêu diệt ({kill_status})"
+                                
+                                if self.alert_callback:
+                                    self.alert_callback(alert)
+                                    
+                            # Cập nhật cột mốc
                             if record_id > last_record_id:
-                                if last_record_id != 0: # Bỏ qua vòng lặp đầu tiên để không báo lại log cũ
-                                    alert = self.detector.scan_event(event_dict)
-                                    if alert:
-                                        pid = event_dict.get('ProcessId')
-                                        kill_status = self._kill_malicious_process(pid, alert['Process'])
-                                        alert['Details'] += f" | EDR: {kill_status}"
-                                        
-                                        if self.alert_callback:
-                                            self.alert_callback(alert)
-                                            
                                 last_record_id = record_id
 
             except Exception as e:
@@ -75,19 +89,18 @@ class EDRMonitor:
                     print("[!] LỖI TỬ HUYỆT: Máy tính của bạn chưa được cài đặt Sysmon!")
                     self.stop_event.set()
                     break
-                elif "258" not in str(e):
-                    print(f"[-] Cảnh báo luồng EDR: {e}")
+                elif "258" not in str(e): # Bỏ qua lỗi Timeout
+                    pass
             finally:
-                # Đóng Handle ngay lập tức sau khi dùng xong
                 if hand:
                     try:
                         hand.Close()
                     except:
                         pass
             
-            time.sleep(1)
+            time.sleep(0.05)
             
-        print("[*] Luồng EDR ngầm đã tắt và trả lại tài nguyên cho Windows an toàn 100%.")
+        print("[*] Luồng EDR ngầm đã tắt an toàn.")
 
     def _parse_live_xml(self, xml_string):
         try:
@@ -111,12 +124,22 @@ class EDRMonitor:
         if not pid_str: return "Không có PID"
         try:
             pid = int(pid_str)
-            p = psutil.Process(pid)
-            p.kill()
-            return f"Thành công ({pid})"
-        except psutil.NoSuchProcess:
-            return "Tự tắt"
-        except psutil.AccessDenied:
-            return "Từ chối truy cập (Cần Admin)"
+            
+            PROCESS_TERMINATE = 1
+            
+            handle = ctypes.windll.kernel32.OpenProcess(PROCESS_TERMINATE, False, pid)
+            
+            if not handle:
+                return "Từ chối truy cập (Hãy chạy phần mềm bằng Quyền Admin)"
+
+            result = ctypes.windll.kernel32.TerminateProcess(handle, 1)
+            
+            ctypes.windll.kernel32.CloseHandle(handle)
+            
+            if result:
+                return f"Thành công (API_KILL - PID: {pid})"
+            else:
+                return "Thất bại (Kẻ địch đã tự sát hoặc có khiên bảo vệ)"
+                
         except Exception as e:
-            return f"Lỗi: {e}"
+            return f"Lỗi cấp thấp: {e}"

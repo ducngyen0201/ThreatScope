@@ -21,22 +21,24 @@ class RuleEngine:
                     file_path = os.path.join(root, file)
                     try:
                         with open(file_path, 'r', encoding='utf-8') as f:
-                            rule_data = yaml.safe_load(f)
-                            if rule_data and "Condition" in rule_data:
-                                eid = str(rule_data["Condition"].get("EventID", ""))
-                                if eid:
-                                    if eid not in self.rules_by_eid:
-                                        self.rules_by_eid[eid] = []
-                                    self.rules_by_eid[eid].append(rule_data)
-                                    rule_count += 1
+                            # SỬA LỖI 1: Dùng safe_load_all để đọc file có nhiều block (---)
+                            for rule_data in yaml.safe_load_all(f):
+                                if not rule_data: 
+                                    continue
+                                
+                                # SỬA LỖI 2: Hỗ trợ linh hoạt cả key "Condition" (cũ) và "Selections" (mới)
+                                condition_block = rule_data.get("Condition") or rule_data.get("Selections")
+                                
+                                if condition_block:
+                                    eid = str(condition_block.get("EventID", rule_data.get("EventID", "")))
+                                    if eid:
+                                        if eid not in self.rules_by_eid:
+                                            self.rules_by_eid[eid] = []
+                                        self.rules_by_eid[eid].append(rule_data)
+                                        rule_count += 1
                     except Exception as e:
                         print(f"[-] Lỗi nạp file luật {file}: {e}")
         print(f"[+] Đã nạp thành công {rule_count} luật hành vi từ thư mục '{self.rules_dir}/'")
-
-    def _match_pattern(self, value, pattern):
-        if not value or not pattern:
-            return False
-        return fnmatch.fnmatch(str(value).lower(), str(pattern).lower())
 
     def evaluate(self, event):
         eid = str(event.get('EventID', ''))
@@ -44,10 +46,11 @@ class RuleEngine:
             return None
 
         for rule in self.rules_by_eid[eid]:
-            condition = rule["Condition"]
+            # Lấy block điều kiện (hỗ trợ cả Condition và Selections)
+            condition = rule.get("Condition") or rule.get("Selections")
             match_condition = True
 
-            # 1. Kiểm tra các điều kiện bắt buộc (Condition)
+            # 1. Kiểm tra các điều kiện bắt buộc
             for field, pattern in condition.items():
                 if field == "EventID": 
                     continue
@@ -88,6 +91,9 @@ class RuleEngine:
                 parent_process = event.get("ParentImage", "")
                 process_name = event.get("Image", event.get("SourceImage", "Unknown Process"))
                 target_object = event.get("ImageLoaded", event.get("TargetImage", "N/A"))
+                
+                # Đồng bộ tên luật (Hỗ trợ cả RuleName và Name)
+                rule_name = rule.get("RuleName") or rule.get("Name", "Behavior")
 
                 return {
                     "Time": event.get('Time', 'N/A'),
@@ -95,9 +101,15 @@ class RuleEngine:
                     "Process": process_name,
                     "DLL": target_object, 
                     "Severity": rule.get("Severity", "HIGH").upper(),
-                    "Technique": f"{rule.get('MitreID', 'T1548')} ({rule.get('Name', 'Behavior')})",
+                    "Technique": f"{rule.get('MitreID', 'T1548')} ({rule_name})",
                     "Source": "Rule Engine",
                     "Details": rule.get("Description", "Phát hiện hành vi bất thường.")
                 }
+
+    def _match_pattern(self, value, pattern):
+        if not value or not pattern:
+            return False
+        return fnmatch.fnmatch(str(value).lower(), str(pattern).lower())
+
 
         return None

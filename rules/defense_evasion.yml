@@ -1,0 +1,31 @@
+---
+RuleName: "PowerShell Downgrade Attack"
+Severity: "HIGH"
+EventID: "1"
+Selections:
+  Image: "*\\powershell.exe"
+  CommandLine: "*-version 2*"
+
+---
+RuleName: "VSSAdmin Shadow Copy Deletion"
+Severity: "CRITICAL"
+EventID: "1"
+Selections:
+  Image: "*\\vssadmin.exe"
+  CommandLine: "*delete shadows*"
+
+---
+RuleName: "Kaseya VSA REvil Ransomware Deployment"
+Severity: "CRITICAL"
+EventID: "1"
+Selections:
+  ParentImage: "*\\agentmon.exe"
+  CommandLine: "*DisableRealtimeMonitoring*"
+
+---
+RuleName: "CVE-2021-40444: MSHTML RCE (CAB Execution)"
+Severity: "HIGH"
+EventID: "1"
+Selections:
+  ParentImage: "*\\control.exe"
+  CommandLine: "*.cpl*"

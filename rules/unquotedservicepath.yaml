@@ -1,0 +1,12 @@
+---
+RuleName: "Unquoted Service Path (Đánh chặn đường dẫn)"
+Severity: "HIGH"
+Description: "Dịch vụ hệ thống bị lừa gọi tệp thực thi cắt ngắn mạo danh"
+EventID: "1"
+Selections:
+  ParentImage: 
+    - "*\\services.exe"
+  Image: 
+    - "*\\common.exe"
+    - "*\\program.exe"
+  IntegrityLevel: "System"

@@ -1,0 +1,14 @@
+---
+RuleName: "DLL Hijacking (EID 1 - Hậu khai thác)"
+Severity: "CRITICAL"
+Description: "Ứng dụng văn phòng bị cướp luồng thực thi lệnh quản trị"
+EventID: "1"
+Selections:
+  ParentImage: 
+    - "*\\notepad++.exe"
+  Image: 
+    - "*\\cmd.exe"
+    - "*\\net.exe"
+  IntegrityLevel: 
+    - "High"
+    - "System"

@@ -1,0 +1,13 @@
+---
+RuleName: "DLL Hijacking (EID 7 - Nạp thư viện Unsigned)"
+Severity: "HIGH"
+Description: "Phát hiện DLL không ký số được nạp từ vùng thư mục người dùng"
+EventID: "7"
+Selections:
+  SignatureStatus: 
+    - "Unsigned"
+    - "Invalid"
+  ImageLoaded:
+    - "*\\AppData\\Local\\*"
+    - "*\\Temp\\*"
+    - "*\\Users\\Public\\*"

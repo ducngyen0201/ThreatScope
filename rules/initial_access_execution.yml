@@ -1,0 +1,82 @@
+---
+RuleName: "CVE-2023-38831: WinRAR RCE Execution"
+Severity: "CRITICAL"
+EventID: "1"
+Selections:
+  ParentImage: "*\\WinRAR.exe"
+  Image: "*\\cmd.exe"
+  CommandLine: "*\\AppData\\Local\\Temp\\Rar$*"
+
+---
+RuleName: "CVE-2017-11882: MS Equation Editor RCE"
+Severity: "CRITICAL"
+EventID: "1"
+Selections:
+  ParentImage: "*\\EQNEDT32.EXE"
+  Image: ["*\\cmd.exe", "*\\powershell.exe"]
+
+---
+RuleName: "MS Word: Malicious Macro Execution"
+Severity: "CRITICAL"
+EventID: "1"
+Selections:
+  ParentImage: "*\\WINWORD.EXE"
+  Image: ["*\\cmd.exe", "*\\powershell.exe"]
+
+---
+RuleName: "MS Excel: Malicious Macro Execution"
+Severity: "CRITICAL"
+EventID: "1"
+Selections:
+  ParentImage: "*\\EXCEL.EXE"
+  Image: ["*\\cmd.exe", "*\\powershell.exe"]
+
+---
+RuleName: "Adobe Acrobat Reader RCE"
+Severity: "CRITICAL"
+EventID: "1"
+Selections:
+  ParentImage: "*\\AcroRd32.exe"
+  Image: "*\\cmd.exe"
+
+---
+RuleName: "CVE-2023-27350: PaperCut MF/NG RCE"
+Severity: "CRITICAL"
+EventID: "1"
+Selections:
+  ParentImage: "*\\pc-app.exe"
+  Image: ["*\\cmd.exe", "*\\powershell.exe"]
+
+---
+RuleName: "CVE-2023-34362: MOVEit Transfer RCE"
+Severity: "CRITICAL"
+EventID: "1"
+Selections:
+  ParentImage: "*\\w3wp.exe"
+  Image: "*\\cmd.exe"
+  CommandLine: "*moveit*"
+
+---
+RuleName: "SolarWinds Sunburst Backdoor Execution"
+Severity: "CRITICAL"
+EventID: "1"
+Selections:
+  ParentImage: "*\\SolarWinds.BusinessLayerHost.exe"
+  Image: "*\\cmd.exe"
+
+---
+RuleName: "3CX DesktopApp Supply Chain Compromise"
+Severity: "HIGH"
+EventID: "7"
+Selections:
+  Image: "*\\3CXDesktopApp.exe"
+  ImageLoaded: "*\\ffmpeg.dll"
+
+---
+RuleName: "AnyDesk Abuse for RCE"
+Severity: "HIGH"
+EventID: "1"
+Selections:
+  ParentImage: "*\\AnyDesk.exe"
+  Image: "*\\cmd.exe"
+  CommandLine: "*/c*"

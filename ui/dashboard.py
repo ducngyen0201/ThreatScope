@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                                QFrame, QPushButton, QTableWidget, 
-                               QTableWidgetItem, QHeaderView, QMessageBox)
+                               QTableWidgetItem, QHeaderView, QMessageBox,
+                               QAbstractItemView, QDialog, QFormLayout, QLineEdit)
 from PySide6.QtGui import QFont, QColor
 from PySide6.QtCore import Qt, Signal, QObject
 
@@ -23,7 +24,6 @@ class DashboardWidget(QWidget):
         self.edr.set_alert_callback(self.signal_handler.new_alert.emit)
         
         self.setup_ui()
-        self.toggle_edr()
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -56,23 +56,28 @@ class DashboardWidget(QWidget):
         layout.addLayout(control_layout)
 
         # --- BẢNG LOG THEO THỜI GIAN THỰC ---
-        lbl_log = QLabel("🔴 Hoạt động Giám sát & Tiêu diệt Thời gian thực:")
+        lbl_log = QLabel("Hoạt động Giám sát & Tiêu diệt Thời gian thực:")
         lbl_log.setFont(QFont("Segoe UI", 12, QFont.Bold))
         layout.addWidget(lbl_log)
 
-        self.table_live = QTableWidget(0, 5)
-        self.table_live.setHorizontalHeaderLabels(["Thời gian", "Tiến trình", "Thư viện (DLL)", "Mức độ", "Trạng thái EDR"])
+        # GIẢM THÔNG TIN BẢNG NGOÀI (Chỉ hiển thị 3 cột)
+        self.table_live = QTableWidget(0, 3)
+        self.table_live.setHorizontalHeaderLabels(["Thời gian", "Tiến trình (EXE)", "Trạng thái EDR"])
         
         header = self.table_live.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Interactive)
         header.setStretchLastSection(True)
         
-        self.table_live.setColumnWidth(0, 150)
-        self.table_live.setColumnWidth(1, 150)
-        self.table_live.setColumnWidth(2, 180)
-        self.table_live.setColumnWidth(3, 100)
+        self.table_live.setColumnWidth(0, 160)
+        self.table_live.setColumnWidth(1, 180)
         
         layout.addWidget(self.table_live)
+
+        # CẤU HÌNH BẢNG (READ-ONLY)
+        self.table_live.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table_live.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table_live.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.table_live.cellDoubleClicked.connect(self.hien_thi_chi_tiet)
 
     def create_stat_card(self, title, value, color):
         frame = QFrame()
@@ -118,23 +123,123 @@ class DashboardWidget(QWidget):
         row = 0
         self.table_live.insertRow(row)
         
-        items = [
-            QTableWidgetItem(alert["Time"]),
-            QTableWidgetItem(alert["Process"]),
-            QTableWidgetItem(alert["DLL"]),
-            QTableWidgetItem(alert["Severity"]),
-            QTableWidgetItem(alert["Details"])
-        ]
-
-        bg_color = QColor("#ffcccc") if alert["Severity"].upper() == "CRITICAL" else QColor("#fff2cc")
+        # Rút gọn trạng thái để hiển thị ở bảng ngoài
+        action_text = "Đã tiêu diệt tiến trình" if "Đã tiêu diệt" in alert.get("Details", "") else "Cảnh báo"
         
-        for i, item in enumerate(items):
+        item_time = QTableWidgetItem(alert.get("Time", "N/A"))
+        item_process = QTableWidgetItem(alert.get("Process", "N/A"))
+        item_action = QTableWidgetItem(action_text)
+
+        bg_color = QColor("#ffcccc") if alert.get("Severity", "").upper() == "CRITICAL" else QColor("#fff2cc")
+        
+        for i, item in enumerate([item_time, item_process, item_action]):
             item.setBackground(bg_color)
-            if i == 3: item.setTextAlignment(Qt.AlignCenter)
             
-            # Đổi màu chữ Trạng thái EDR (Cột cuối) để làm nổi bật hành động Kill Process
-            if i == 4 and "Đã tiêu diệt" in alert["Details"]:
+            item.setData(Qt.UserRole, alert) 
+            
+            if i == 2 and "tiêu diệt" in action_text:
                 item.setForeground(QColor("#1e7145"))
                 item.setFont(QFont("Segoe UI", 10, QFont.Bold))
                 
             self.table_live.setItem(row, i, item)
+
+    def hien_thi_chi_tiet(self, row, column):
+        
+        alert_data = self.table_live.item(row, column).data(Qt.UserRole)
+        
+        if alert_data:
+            self.detail_window = LiveAlertDetailWindow(alert_data)
+            self.detail_window.show()
+        else:
+            print("[!] Lỗi: Không tìm thấy dữ liệu ngầm tại ô này.")
+
+
+# --- LỚP GIAO DIỆN CỬA SỔ POP-UP CHI TIẾT ---
+class LiveAlertDetailWindow(QDialog):
+    def __init__(self, alert_data):
+        super().__init__()
+        
+        self.setWindowTitle("Chi tiết Cảnh báo Hành vi")
+        self.resize(550, 600)
+        self.setWindowModality(Qt.NonModal)
+        self.setStyleSheet("QDialog { background-color: #f8f9fa; }") # Nền xám nhạt rất nhẹ
+        
+        layout = QVBoxLayout(self)
+        layout.setSpacing(15)
+        
+        # --- HEADER (Tiêu đề giống ảnh) ---
+        lbl_ma = QLabel("<b>Mã nhận diện: T1574.001 (DLL Search Order Hijacking)</b>")
+        lbl_ma.setStyleSheet("color: #d97706; font-size: 14px;") # Màu cam đất
+        layout.addWidget(lbl_ma)
+        
+        severity = alert_data.get("Severity", "N/A")
+        lbl_rui_ro = QLabel(f"<b>Đánh giá rủi ro: {severity} | Nguồn: Rule Engine</b>")
+        lbl_rui_ro.setStyleSheet("color: #333333; font-size: 12px;")
+        layout.addWidget(lbl_rui_ro)
+        
+        # --- KHỐI FORM THÔNG TIN ---
+        form_layout = QVBoxLayout()
+        form_layout.setSpacing(12)
+        
+        # Hàm tạo giao diện Box theo chuẩn Forensics
+        def create_info_box(label_text, value_text):
+            box = QVBoxLayout()
+            box.setSpacing(0)
+            
+            # Tiêu đề box (Nền xám)
+            lbl = QLabel(label_text)
+            lbl.setStyleSheet("""
+                background-color: #e9ecef; 
+                border: 1px solid #ced4da; 
+                border-bottom: none;
+                border-top-left-radius: 4px; 
+                border-top-right-radius: 4px;
+                padding: 6px; 
+                font-weight: bold; 
+                color: #495057;
+            """)
+            
+            # Nội dung box (Nền trắng)
+            txt = QLineEdit(value_text)
+            txt.setReadOnly(True)
+            txt.setCursorPosition(0)
+            txt.setStyleSheet("""
+                background-color: #ffffff; 
+                border: 1px solid #ced4da; 
+                border-bottom-left-radius: 4px; 
+                border-bottom-right-radius: 4px;
+                padding: 8px; 
+                color: #212529;
+            """)
+            
+            box.addWidget(lbl)
+            box.addWidget(txt)
+            return box
+
+        raw_details = alert_data.get("Details", "")
+        
+        dll_path = raw_details.split(" | ")[0].replace("Nạp từ đường dẫn bất thường (", "").replace(")", "") if "|" in raw_details else "N/A"
+        
+        action_taken = raw_details.split(" | ")[-1].replace("Trạng thái: ", "") if "|" in raw_details else raw_details
+
+        # Thêm các trường dữ liệu
+        form_layout.addLayout(create_info_box("Thời gian ghi nhận:", alert_data.get("Time", "N/A")))
+        form_layout.addLayout(create_info_box("Tệp tin thực thi (Tiến trình cha / EXE):", alert_data.get("Process", "N/A")))
+        form_layout.addLayout(create_info_box("Thư viện bị lạm dụng (Tên tệp DLL):", alert_data.get("DLL", "N/A")))
+        form_layout.addLayout(create_info_box("Đường dẫn nạp thư viện:", dll_path))
+        form_layout.addLayout(create_info_box("Hành động của hệ thống EDR:", action_taken))
+        
+        layout.addLayout(form_layout)
+        layout.addStretch()
+        
+        # --- NÚT ĐÓNG ---
+        btn_layout = QHBoxLayout()
+        btn_close = QPushButton("Đóng cửa sổ")
+        btn_close.setFlat(True) # Nút dạng Text phẳng giống ảnh
+        btn_close.setCursor(Qt.PointingHandCursor)
+        btn_close.setStyleSheet("QPushButton { color: #495057; font-size: 12px; } QPushButton:hover { color: #000000; font-weight: bold; }")
+        btn_close.clicked.connect(self.close)
+        btn_layout.addStretch()
+        btn_layout.addWidget(btn_close)
+        
+        layout.addLayout(btn_layout)

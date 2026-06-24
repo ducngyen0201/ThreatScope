@@ -1,0 +1,39 @@
+---
+RuleName: "Certutil Payload Download (LoLBins)"
+Severity: "HIGH"
+EventID: "1"
+Selections:
+  Image: "*\\certutil.exe"
+  CommandLine: "*-urlcache*http*"
+
+---
+RuleName: "MSBuild Fileless Execution (LoLBins)"
+Severity: "HIGH"
+EventID: "1"
+Selections:
+  Image: "*\\MSBuild.exe"
+  CommandLine: "*.csproj*"
+
+---
+RuleName: "Rundll32 Executing JavaScript"
+Severity: "CRITICAL"
+EventID: "1"
+Selections:
+  Image: "*\\rundll32.exe"
+  CommandLine: "*javascript:*"
+
+---
+RuleName: "Regsvr32 Squiblydoo Bypass"
+Severity: "CRITICAL"
+EventID: "1"
+Selections:
+  Image: "*\\regsvr32.exe"
+  CommandLine: "*/i:http*scrobj.dll"
+
+---
+RuleName: "WMI Provider Host (WmiPrvSE) Suspicious Spawning"
+Severity: "HIGH"
+EventID: "1"
+Selections:
+  ParentImage: "*\\WmiPrvSE.exe"
+  Image: "*\\cmd.exe"
