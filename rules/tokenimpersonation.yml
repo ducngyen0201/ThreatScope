@@ -1,0 +1,14 @@
+---
+RuleName: "Token Impersonation (PrintSpoofer/Services)"
+Severity: "CRITICAL"
+Description: "Dịch vụ hoặc công cụ lạm dụng Token để sinh shell quyền SYSTEM"
+EventID: "1"
+Selections:
+  ParentImage:
+    - "*\\services.exe"
+    - "*\\spoolsv.exe"
+    - "*printspoofer*"
+  Image:
+    - "*\\cmd.exe"
+    - "*\\powershell.exe"
+  IntegrityLevel: "System"

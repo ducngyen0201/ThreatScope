@@ -201,9 +201,30 @@ class AlertDetailDialog(QDialog):
         # --- NÚT ĐÓNG ---
         btn_layout = QHBoxLayout()
         btn_close = QPushButton("Đóng cửa sổ")
-        btn_close.setFixedWidth(120)
-        btn_close.setMinimumHeight(30)
+        btn_close.setCursor(Qt.PointingHandCursor) # Chuyển chuột thành hình bàn tay khi di vào
+        
+        # Áp dụng CSS đồng bộ với bảng điều khiển chính
+        btn_close.setStyleSheet("""
+            QPushButton { 
+                background-color: #e9ecef; 
+                border: 1px solid #ced4da; 
+                border-radius: 4px; 
+                padding: 8px 20px; 
+                color: #495057; 
+                font-weight: bold;
+                font-size: 12px;
+            } 
+            QPushButton:hover { 
+                background-color: #dee2e6; 
+                color: #000000; 
+                border: 1px solid #adb5bd;
+            }
+            QPushButton:pressed {
+                background-color: #ced4da;
+            }
+        """)
         btn_close.clicked.connect(self.close)
+        
         btn_layout.addStretch()
         btn_layout.addWidget(btn_close)
         

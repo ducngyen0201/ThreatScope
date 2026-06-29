@@ -1,6 +1,6 @@
 ---
 RuleName: "RoguePlanet - Initial Exploit Execution"
-Description: "Cảnh báo sớm: Phát hiện tệp thực thi mã khai thác khởi chạy trên hệ thống."
+Description: "Phát hiện tệp thực thi mã khai thác khởi chạy trên hệ thống."
 Severity: "HIGH"
 EventID: "1"
 Selections:
@@ -8,7 +8,7 @@ Selections:
 
 ---
 RuleName: "Anomalous SYSTEM Shell (RoguePlanet LPE Pattern)"
-Description: "Bắt quả tang LPE (Điểm nổ): Phát hiện vỏ lệnh tương tác được sinh ra với đặc quyền SYSTEM từ các tiến trình trung gian. Đây là kết quả trực tiếp của việc lạm dụng Race Condition để thao túng luồng thực thi."
+Description: "Phát hiện vỏ lệnh tương tác được sinh ra với đặc quyền SYSTEM từ các tiến trình trung gian. Đây là kết quả trực tiếp của việc lạm dụng Race Condition để thao túng luồng thực thi."
 Severity: "CRITICAL"
 EventID: "1"
 Selections:

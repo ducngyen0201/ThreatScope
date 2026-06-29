@@ -113,7 +113,6 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     
-    # 1. Cảnh báo nếu không có quyền Admin
     if not is_admin():
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Warning)
@@ -121,10 +120,8 @@ if __name__ == "__main__":
         msg.setText("Phần mềm chưa được chạy bằng quyền Administrator (Run as Administrator).\n\nTính năng Tự động cài Sysmon và Tiêu diệt tiến trình (EDR) sẽ không hoạt động!")
         msg.exec()
     else:
-        # 2. Tự động kiểm tra và cài đặt cấu hình Sysmon nếu có quyền Admin
         ensure_sysmon_ready()
     
-    # 3. Mở giao diện
     window = ThreatScopeWindow()
     window.show()
     sys.exit(app.exec())

@@ -9,7 +9,6 @@ class RuleEngine:
         self.load_all_rules()
 
     def load_all_rules(self):
-        """Quét đệ quy thư mục rules/ và nạp tất cả file YAML vào RAM"""
         if not os.path.exists(self.rules_dir):
             os.makedirs(self.rules_dir)
             return
@@ -21,12 +20,10 @@ class RuleEngine:
                     file_path = os.path.join(root, file)
                     try:
                         with open(file_path, 'r', encoding='utf-8') as f:
-                            # SỬA LỖI 1: Dùng safe_load_all để đọc file có nhiều block (---)
                             for rule_data in yaml.safe_load_all(f):
                                 if not rule_data: 
                                     continue
                                 
-                                # SỬA LỖI 2: Hỗ trợ linh hoạt cả key "Condition" (cũ) và "Selections" (mới)
                                 condition_block = rule_data.get("Condition") or rule_data.get("Selections")
                                 
                                 if condition_block:
@@ -46,23 +43,19 @@ class RuleEngine:
             return None
 
         for rule in self.rules_by_eid[eid]:
-            # Lấy block điều kiện (hỗ trợ cả Condition và Selections)
             condition = rule.get("Condition") or rule.get("Selections")
             match_condition = True
 
-            # 1. Kiểm tra các điều kiện bắt buộc
             for field, pattern in condition.items():
                 if field == "EventID": 
                     continue
                 
                 event_value = event.get(field, "")
                 
-                # Nếu mẫu điều kiện là một danh sách (List)
                 if isinstance(pattern, list):
                     if not any(self._match_pattern(event_value, p) for p in pattern):
                         match_condition = False
                         break
-                # Nếu mẫu điều kiện là một chuỗi đơn (String)
                 else:
                     if not self._match_pattern(event_value, pattern):
                         match_condition = False
@@ -71,7 +64,6 @@ class RuleEngine:
             if not match_condition:
                 continue
 
-            # 2. Kiểm tra danh sách trắng (Whitelist) để giảm False Positive
             is_whitelisted = False
             whitelist = rule.get("Whitelist", {})
             if whitelist:
@@ -86,30 +78,29 @@ class RuleEngine:
                             is_whitelisted = True
                             break
 
-            if not is_whitelisted:
-                # Trích xuất dữ liệu đa chiều
-                parent_process = event.get("ParentImage", "")
-                process_name = event.get("Image", event.get("SourceImage", "Unknown Process"))
-                target_object = event.get("ImageLoaded", event.get("TargetImage", "N/A"))
+            if is_whitelisted:
+                continue
                 
-                # Đồng bộ tên luật (Hỗ trợ cả RuleName và Name)
-                rule_name = rule.get("RuleName") or rule.get("Name", "Behavior")
+            parent_process = event.get("ParentImage", "")
+            process_name = event.get("Image", event.get("SourceImage", "Unknown Process"))
+            target_object = event.get("ImageLoaded", event.get("TargetImage", "N/A"))
+            rule_name = rule.get("RuleName") or rule.get("Name", "Behavior")
 
-                return {
-                    "Time": event.get('Time', 'N/A'),
-                    "Parent Process": parent_process,
-                    "Process": process_name,
-                    "DLL": target_object, 
-                    "Severity": rule.get("Severity", "HIGH").upper(),
-                    "Technique": f"{rule.get('MitreID', 'T1548')} ({rule_name})",
-                    "Source": "Rule Engine",
-                    "Details": rule.get("Description", "Phát hiện hành vi bất thường.")
-                }
+            return {
+                "Time": event.get('Time', 'N/A'),
+                "Parent Process": parent_process,
+                "Process": process_name,
+                "DLL": target_object, 
+                "Severity": rule.get("Severity", "HIGH").upper(),
+                "Technique": f"{rule.get('MitreID', 'T1548')} ({rule_name})",
+                "Source": "Rule Engine",
+                "Details": rule.get("Description", "Phát hiện hành vi bất thường.")
+            }
+
+        return None 
+
 
     def _match_pattern(self, value, pattern):
         if not value or not pattern:
             return False
         return fnmatch.fnmatch(str(value).lower(), str(pattern).lower())
-
-
-        return None

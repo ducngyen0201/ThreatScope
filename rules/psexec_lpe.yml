@@ -1,0 +1,9 @@
+---
+RuleName: "PsExec LPE - Spawning Anomalous SYSTEM Process"
+Severity: "CRITICAL"
+Description: "Phát hiện dịch vụ PsExec (PSEXESVC.exe) đẻ ra các tiến trình mang đặc quyền SYSTEM. Kẻ tấn công thường dùng PsExec để leo quyền từ Admin lên SYSTEM."
+EventID: "1"
+Selections:
+  ParentImage:
+    - "*\\PSEXESVC.exe"
+  IntegrityLevel: "System"

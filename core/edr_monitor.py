@@ -13,6 +13,7 @@ class EDRMonitor:
         self.log_channel = "Microsoft-Windows-Sysmon/Operational"
         self.ns = '{http://schemas.microsoft.com/win/2004/08/events/event}'
         self.alert_callback = None 
+        self.killed_pids = set()
 
     @property
     def is_running(self):
@@ -72,15 +73,18 @@ class EDRMonitor:
                             alert = self.detector.scan_event(event_dict)
                             if alert:
                                 pid = event_dict.get('ProcessId')
+
+                                if pid in self.killed_pids:
+                                    continue
+
+                                self.killed_pids.add(pid)
                                 
-                                # Tiêu diệt và báo cáo gọn gàng
                                 kill_status = self._kill_malicious_process(pid, alert['Process'])
                                 alert['Details'] += f" | Trạng thái: Đã tiêu diệt ({kill_status})"
                                 
                                 if self.alert_callback:
                                     self.alert_callback(alert)
                                     
-                            # Cập nhật cột mốc
                             if record_id > last_record_id:
                                 last_record_id = record_id
 
@@ -89,7 +93,7 @@ class EDRMonitor:
                     print("[!] LỖI TỬ HUYỆT: Máy tính của bạn chưa được cài đặt Sysmon!")
                     self.stop_event.set()
                     break
-                elif "258" not in str(e): # Bỏ qua lỗi Timeout
+                elif "258" not in str(e):
                     pass
             finally:
                 if hand:
@@ -99,6 +103,8 @@ class EDRMonitor:
                         pass
             
             time.sleep(0.05)
+
+            
             
         print("[*] Luồng EDR ngầm đã tắt an toàn.")
 

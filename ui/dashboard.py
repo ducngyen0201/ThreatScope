@@ -162,31 +162,37 @@ class LiveAlertDetailWindow(QDialog):
         self.setWindowTitle("Chi tiết Cảnh báo Hành vi")
         self.resize(550, 600)
         self.setWindowModality(Qt.NonModal)
-        self.setStyleSheet("QDialog { background-color: #f8f9fa; }") # Nền xám nhạt rất nhẹ
+        self.setStyleSheet("QDialog { background-color: #f8f9fa; }")
         
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
         
-        # --- HEADER (Tiêu đề giống ảnh) ---
-        lbl_ma = QLabel("<b>Mã nhận diện: T1574.001 (DLL Search Order Hijacking)</b>")
-        lbl_ma.setStyleSheet("color: #d97706; font-size: 14px;") # Màu cam đất
+        technique_id = alert_data.get("Technique", "Chưa xác định")
+        
+        technique_name = alert_data.get("TechniqueName")
+        if not technique_name:
+            technique_name = "Hành vi leo quyền/Thực thi mã độc"
+            
+        tech_display = f"{technique_id} ({technique_name})" if technique_id != "Chưa xác định" else "Không xác định kỹ thuật"
+        
+        lbl_ma = QLabel(f"<b>Mã nhận diện: {tech_display}</b>")
+        lbl_ma.setStyleSheet("color: #d97706; font-size: 14px;")
         layout.addWidget(lbl_ma)
         
         severity = alert_data.get("Severity", "N/A")
-        lbl_rui_ro = QLabel(f"<b>Đánh giá rủi ro: {severity} | Nguồn: Rule Engine</b>")
+        source = alert_data.get("Source", "Hệ thống Phân tích")
+        
+        lbl_rui_ro = QLabel(f"<b>Đánh giá rủi ro: {severity} | Nguồn: {source}</b>")
         lbl_rui_ro.setStyleSheet("color: #333333; font-size: 12px;")
         layout.addWidget(lbl_rui_ro)
         
-        # --- KHỐI FORM THÔNG TIN ---
         form_layout = QVBoxLayout()
         form_layout.setSpacing(12)
         
-        # Hàm tạo giao diện Box theo chuẩn Forensics
         def create_info_box(label_text, value_text):
             box = QVBoxLayout()
             box.setSpacing(0)
             
-            # Tiêu đề box (Nền xám)
             lbl = QLabel(label_text)
             lbl.setStyleSheet("""
                 background-color: #e9ecef; 
@@ -199,7 +205,6 @@ class LiveAlertDetailWindow(QDialog):
                 color: #495057;
             """)
             
-            # Nội dung box (Nền trắng)
             txt = QLineEdit(value_text)
             txt.setReadOnly(True)
             txt.setCursorPosition(0)
@@ -222,7 +227,6 @@ class LiveAlertDetailWindow(QDialog):
         
         action_taken = raw_details.split(" | ")[-1].replace("Trạng thái: ", "") if "|" in raw_details else raw_details
 
-        # Thêm các trường dữ liệu
         form_layout.addLayout(create_info_box("Thời gian ghi nhận:", alert_data.get("Time", "N/A")))
         form_layout.addLayout(create_info_box("Tệp tin thực thi (Tiến trình cha / EXE):", alert_data.get("Process", "N/A")))
         form_layout.addLayout(create_info_box("Thư viện bị lạm dụng (Tên tệp DLL):", alert_data.get("DLL", "N/A")))
@@ -235,10 +239,29 @@ class LiveAlertDetailWindow(QDialog):
         # --- NÚT ĐÓNG ---
         btn_layout = QHBoxLayout()
         btn_close = QPushButton("Đóng cửa sổ")
-        btn_close.setFlat(True) # Nút dạng Text phẳng giống ảnh
         btn_close.setCursor(Qt.PointingHandCursor)
-        btn_close.setStyleSheet("QPushButton { color: #495057; font-size: 12px; } QPushButton:hover { color: #000000; font-weight: bold; }")
+        
+        btn_close.setStyleSheet("""
+            QPushButton { 
+                background-color: #e9ecef; 
+                border: 1px solid #ced4da; 
+                border-radius: 4px; 
+                padding: 8px 20px; 
+                color: #495057; 
+                font-weight: bold;
+                font-size: 12px;
+            } 
+            QPushButton:hover { 
+                background-color: #dee2e6; 
+                color: #000000; 
+                border: 1px solid #adb5bd;
+            }
+            QPushButton:pressed {
+                background-color: #ced4da;
+            }
+        """)
         btn_close.clicked.connect(self.close)
+        
         btn_layout.addStretch()
         btn_layout.addWidget(btn_close)
         
